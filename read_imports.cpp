@@ -145,6 +145,12 @@ void printImportDirectory(ifstream& exeFile, const vector<IMAGE_SECTION_HEADER>&
 }
 
 int readPEFile(const string& fileName) {
+    IMAGE_DOS_HEADER dosHeader;
+    IMAGE_NT_HEADERS64 ntHeaders;
+    vector<IMAGE_SECTION_HEADER> sections(0);
+    DWORD importDirRVA = NULL;
+    DWORD importDirSize = NULL;
+
     ifstream exeFile(fileName.c_str(), ios::binary);
     if(!exeFile) {
         std::cerr << "Failed to open file\n";
@@ -152,7 +158,6 @@ int readPEFile(const string& fileName) {
     }
 
     // Read dos headers
-    IMAGE_DOS_HEADER dosHeader;
     exeFile.read(reinterpret_cast<char*>(&dosHeader), sizeof(dosHeader));
     if(dosHeader.e_magic != IMAGE_DOS_SIGNATURE) {
         std::cerr << "Not PE file\n";
@@ -161,8 +166,7 @@ int readPEFile(const string& fileName) {
     printDOSHeader(dosHeader);
 
     // Read NT Headers
-    IMAGE_NT_HEADERS64 ntHeaders;
-    exeFile.seekg(dosHeader.e_lfanew, std::ios::beg);
+    exeFile.seekg(dosHeader.e_lfanew, ios::beg);
     exeFile.read(reinterpret_cast<char*>(&ntHeaders), sizeof(ntHeaders));
     if(ntHeaders.Signature != IMAGE_NT_SIGNATURE) {
         std::cerr << "Not NT signature\n";
@@ -171,14 +175,14 @@ int readPEFile(const string& fileName) {
     printNTHeaders(ntHeaders);
 
     // Read section headers
-    vector<IMAGE_SECTION_HEADER> sections(ntHeaders.FileHeader.NumberOfSections);
-    exeFile.seekg(dosHeader.e_lfanew + sizeof(IMAGE_NT_HEADERS64), std::ios::beg);
+    sections.resize(ntHeaders.FileHeader.NumberOfSections);
+    exeFile.seekg(dosHeader.e_lfanew + sizeof(IMAGE_NT_HEADERS64), ios::beg);
     exeFile.read(reinterpret_cast<char*>(sections.data()), sizeof(IMAGE_SECTION_HEADER) * ntHeaders.FileHeader.NumberOfSections);
     printSectionHeaders(sections);
 
     // Read Import Directory Table
-    DWORD importDirRVA = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
-    DWORD importDirSize = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size;
+    importDirRVA = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress;
+    importDirSize = ntHeaders.OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size;
     printImportDirectory(exeFile, sections, importDirRVA, importDirSize);
 
     exeFile.close();
